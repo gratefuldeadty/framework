@@ -1,59 +1,221 @@
-class router {
-static function route() {
-$url = explode('?',$_SERVER['REQUEST_URI']);
-$path = mb_strtolower($url[0]);
-while (substr($path, -1) == '/') {
-$path = mb_substr($path,0,(mb_strlen($path)-1));
+<?php
+
+class Router
+{
+        private $routes = [];
+
+        function __construct()
+        {
+                $this->routes = [
+                        '/user/:userid' => 'user:viewProfile'
+                ];
+        }
+        
+        function route()
+        {
+                // parse the url, splitting it.
+                $url = filter_var($_GET['url'], FILTER_VALIDATE_URL);
+                $path = parse_url($url, PHP_URL_PATH);
+                $url = explode('/', rtrim($path, '/'));
+                
+                $path_params = $url;
+                
+                // default, index.
+                if (count($path_params == 1))
+                {
+                        $this->controllerAction('index', 'index', [], []);
+                }
+                
+                // loop through all routes, try to find a match.
+                foreach ($this->routes as $route => $controller)
+                {
+                        $route_params = explode('/', $route);
+                        $action = 'index';
+                        $i = 0;
+                        $objs = [];
+                        $valid_route = true;
+                        $path_params = array_pad($path_params, count($route_params), '');
+                        $params = [];
+                        
+                        // handle routes that call a specific action.
+                        $controller_action = explode(':', $controller);
+                        $controller = $controller_action[0];
+                        if (count($controller_action) == 2)
+                        {
+                                $action = $controller_action[1];
+                        }
+                        
+                        // loop through each component of this route until a non-match is found, or url is done.
+                        foreach ($route_params as $route_param)
+                        {
+                                // named parameter route
+                                if (substr($route_param, 0, 1) == ':')
+                                {
+                                        $params[substr($route_param, 1)] = $path_params[$i];
+                                }
+                                elseif ($route_component == '[action]') // action route
+                                {
+                                        if (isset($path_params[$i])
+                                        {
+                                                $action = str_replace('-','_', $path_params[$i]);
+                                        }
+                                }
+                                elseif (substr($route_param, 0, 1) == '(' AND substr($route_param, -1, 1) == ')')
+                                {
+                                        // create the object for the action
+                                        $reflection_obj = new ReflectionClass(substr($route_component, 1, strlen($route_component) - 2));)
+                                        $obj = $reflection_obj->newInstanceArgs([$path_params[$i]]);
+                                        $objs[] = $obj;
+                                }
+                                elseif ($route_param != $path_param[$i] AND str_replace('-','_', $route_param) != $path_param[$i])
+                                {
+                                        $valid_route = false;
+                                        break;
+                                }
+                                ++$i;
+                        }
+                        
+                        // route is a match, create the controller object.
+                        if ($valid_route AND ($i >= count($path_params) OR !isset($path_params[$i])))
+                        {
+                                $this->controllerAction($controller, $action, $objs, $parameters);
+                        }
+                }
+                // display an error
+                $this->controllerAction('index', 'error', [], []);
+        }
+        
+        /**
+         * Search for a controller file that matches the request, than load a view.
+         */
+        public function controllerAction($controller, $action, $objects, $parameters)
+        {
+                $action = ($action == 'new') ? 'edit' : $action;
+                
+                // look for the controller
+                $controller_path = 'application/controllers/' . $controller . '.php';
+                if (is_readable($controller_path))
+                {
+                        require_once $controller_path;
+                        $components = explode('/', $controller);
+                        $class = $components[count($components) - 1];
+                        $controller_class = $class . 'Controller';
+                        if (!method_exists($controller_class, $action))
+                        {
+                                if ($this->render($controller, $action))
+                                {
+                                        exit;
+                                }
+                                else
+                                {
+                                        echo $controller_class.' could not respond to '.$action;
+                                        exit;
+                                }
+                        }
+                        $controller_new = new $controller_class();
+                        $controller_new->parameters = $parameters;
+                        call_user_func_array([$controller_new, $action], $objects);
+                        exit;
+                }
+                if ($this->render($controller, $action)) // no controller found, look for view instead!
+                {
+                        exit;
+                }
+        }
+        
+        public function render($controller, $action)
+        {
+                $path = 'application/views/' . $controller . '/' . $action . '.php';
+                if (is_readable($path))
+                {
+                        $controller_new = new Controller();
+                        require_once $path;
+                        return true;
+                }
+                return false; // default return.
+        }
 }
-$path_components = explode('/', $path);
-//default actions are called 'index'
-$action = "index";
-//Handle home page requests
-if (count($path_components) == 1) {
-router::perform_controller_action("home",$action,array(),array());
+
+// -- controller examples -->>
+
+class Controller
+{
+        private $dbh;
+        public $parameters = [];
+        
+        function __construct()
+        {
+                Session::init(); // starts a session.
+                try
+                {
+                        $this->dbh = new Database(); // creates a new PDO connection object handler.
+                }
+                catch (PDOException $e)
+                {
+                        die('Error: Could not establish a database connection!');
+                }
+        }
 }
-//Loop through all the routes we defined in route.php, and try to find one that matches our request
-foreach ($GLOBALS['routes'] as $route => $controller) {
-$route_components = explode("/",$route);
-$action = "index";
-$i=0;
-$objects = array();
-$goodRoute = true;
-$path_components = array_pad($path_components, count($route_components), '');
-$parameters = array();
-//Handle routes that call a specific action
-$controller_action_array = explode(":",$controller);
-$controller = $controller_action_array[0];
-if (count($controller_action_array) == 2) {
-$action = $controller_action_array[1];
+
+class UserController extends Controller
+{
+        function __construct()
+        {
+                parent::__construct();
+        }
+        
+        /**
+         * Get a user profile, based off $_GET / userid (stored in the routes.)
+         * @return void
+         */
+        function viewProfile()
+        {
+                $users = new Users($this->dbh);
+                $user = $users->userData($this->parameters['userid']);
+                require_once 'views/templates/header.php';
+                require_once 'views/user/profile.php';
+                require_once 'views/templates/footer.php';
+                exit;
+        }
 }
-//Loop through each component of this route until we find a part that doesn't match, or we run out of url
-foreach ($route_components as $route_component) {
-//This part of the route is a named parameter
-if (substr($route_component,0,1) == ":") {
-$parameters[substr($route_component,1)] = $path_components[$i];
-//This part of the route is an action for a controller
-} elseif ($route_component == "[action]") {
-if ($path_components[$i] != "") {
-$action = str_replace("-","_",$path_components[$i]);
+
+// -- end controller examples -->>
+
+// -- model examples -->>
+
+class Model
+{
+        private $dbh;
+        public $is_valud = false;
+        
+        function __construct(Database $dbh)
+        {
+                $this->dbh = $dbh;
+                $this->is_valid = false;
+        }
 }
-//This part of the route will require that we create an object
-} elseif (substr($route_component,0,1) == "(" && substr($route_component,-1,1) == ")") {
-$reflection_obj = new ReflectionClass(substr($route_component,1,strlen($route_component)-2));
-$object = $reflection_obj->newInstanceArgs(array($path_components[$i]));
-$objects[] = $object;
-//Part of the url that isn't an action or an object didn't match, this definitely isn't the right route
-} elseif ($route_component != $path_components[$i] && str_replace("-","_",$route_component) != $path_components[$i]) {
-//echo "Bad match: ".str_replace("-","_",$route_component)." != ".$path_components[$i]."<br />";
-$goodRoute = false;
-break;
+
+class User extends Model
+{
+        function __construct()
+        {
+                parent::__construct();
+        }
+        
+        public function userData($userid = '')
+        {
+                if (isset($userid))
+                {
+                        if (is_numeric($userid))
+                        {
+                                $query = $this->dbh->prepare('SELECT `username` FROM `users`
+                                        WHERE `userid` = ?');
+                                $query->execute(array($userid));
+                                $user = $query->fetch();
+                                $this->is_valid = true;
+                        }
+                }
+        }
 }
-$i++;
-}
-//This route is a match for our request, let's get the controller working on it
-if ($goodRoute && ($i >= count($path_components) || $path_components[$i] == "")) {
-router::perform_controller_action($controller,$action,$objects,$parameters);
-}
-}
-error_404();
-}
+
+// -- end model examples -->>
