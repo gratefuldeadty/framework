@@ -1,5 +1,7 @@
 <?php
 
+namespace Application\libs\Router
+
 class Router
 {
         private $routes = [];
@@ -219,3 +221,290 @@ class User extends Model
 }
 
 // -- end model examples -->>
+
+/**
+ * Class to render urls to switch from clean urls to querystrings
+ */
+namespace application\libs\presentation;
+use application\libs\router;
+class Url implements UrlRenderer
+{
+        private $type; // the type of URI
+        
+        /**
+         * Constructor
+         * @param int $type
+         */
+        public function __construct($type)
+        {
+                $this->type = $type;
+        }
+        
+        /**
+         * Get the URI based on the type
+         */
+        public function get($identifier)
+        {
+                if ($this->type === Router::URL_REWRITE)
+                {
+                        return $this->getRewriteUrl($identifier);
+                }
+                return $this->getQueryStringUrl($identifier);
+        }
+        
+        /**
+         * Get the URI based on the rewrite scheme.
+         */
+         private function getRewriteUrl($identifier)
+         {
+                 if ($identifier === 'status')
+                 {
+                         return '..';
+                 }
+                 return '/' . $identifier;
+         }
+         
+         /**
+          * Gets the URL based on query strings
+          */
+          private function getQueryStringUrl($identifier)
+          {
+                  if ($identifier === 'status')
+                  {
+                          return '?';
+                  }
+                  return '?' . $identifier;
+          }
+}
+
+/**
+ * Interface for URI rendering
+ */
+namespace application\libs\presentation;
+interface UrlRenderer
+{
+        /**
+         * Get the URI based on the type
+         * @param string $identifier
+         */
+        public function get($identifier)
+}
+
+namespace application\libs\presentation;
+abstract class Template implements Renderer
+{
+        protected $template_directory;
+        protected $translator;
+        protected $vars = [];
+        
+        public function __construct($template_directory, Translator $translator)
+        {
+                $this->template_directory = $template_directory;
+                $this->translator = $translator;
+        }
+        
+        public function __get($key)
+        {
+                if (!array_key_exists($key, $this->vars))
+                {
+                        return null;
+                }
+                return $this->vars[$key];
+        }
+        
+        public function __isset($key)
+        {
+                return isset($this->vars[$key]);
+        }
+}
+
+namespace application\libs\presentation;
+interface Renderer
+{
+        public function render($template, array $data = []);
+}
+
+
+namespace application\libs\presentation
+use application\Il8n\translator
+class Html extends Template
+{
+        private $base_template;
+        private $url;
+        
+        public function __construct($template_directory, $base_template, Translator $translator, UrlRenderer $url)
+        {
+                parent::__construct($template_directory, $translator);
+                $this->base_template = $base_template;
+                $this->url = $url;
+        }
+        
+        public function render($template, array $data = [])
+        {
+                $this->vars = $data;
+                $this->vars['content'] = $this->renderTemplate($template);
+                return $this->renderTemplate($this->base_template);
+        }
+        
+        /**
+         * Renders the template (view) file using output buffering.
+         * @param string $template
+         * @return string - rendered view/template
+         */
+        private function renderTemplate($template)
+        {
+                ob_start();
+                require 'application/views/template/header.php';
+                require $this->template_directory . '/' . $template;
+                require 'application/views/template/footer.php';
+                $content = ob_get_contents();
+                ob_end_clean();
+                return $content;
+                
+        }
+}
+
+
+
+$attack_type = isset($_GET['type']);
+
+// Only allow 'pvp' and 'pvm' (player vs. player) and (player vs. mob)
+$allowed_types = ['pvp', 'pvm'];
+if (!in_array($attack_type, $allowed_types))
+{
+        Session::setArr('feedback_negative', 'Error:' . htmlspecialchars($attack_type, ENT_QUOTES) . ' - Invalid attack type.');
+        $this->feedbackRender();
+}
+
+
+if ($attack_type == 'pvp')
+{
+        if (!isset($_POST['attacker_name']))
+        {
+                Session::setArr('feedback_negative', 'Error: You must enter a playername to attack!');
+                $this->feedbackRender();
+        }
+
+        /**
+         * Build the target fetch, 'pvp' select the user being attacked, 'pvm' select the mob.
+         * @param string $type
+         * @param mixed $target
+         * @return fetch : bool (false)
+         */
+         $target_select = ($attack_type == 'pvp') ? $_POST['targetname'] : isset($_GET['mobid']);
+         public function target($type, $target)
+         {
+                return $this->players->playerByName($target)
+                // since no class is built yet for users, this is the query.
+                $query = $this->dbh->prepare('SELECT `username`,`attack`,`hp`,`critical`,`block`,`rampage`
+                        FROM `stats` WHERE `username` = ?');
+                $query->execute(array($_POST['attacker_name']));     
+         }
+         
+        
+}
+
+
+// defender (player) : defender (mob)
+$target_hp = (isset($_GET['type']) == 'pvp') ? $stat['hp'] : $mob['hp'];
+$target_attack = (isset($_GET['type']) == 'pvm') ? $stat['attack'] : $mob['attack'];
+
+// Attacking loop.
+
+$winner = null;
+while ($player_hp > 0 OR $target_hp > 0 AND $winner = null)
+{
+        static $i = 0;
+        static $attack_turn = 'player';
+        if ($attack_turn == 'player')
+        {
+                
+                if ($target_block >= rand(1,100))
+                {
+                        $hit_type = 'blocked';
+                        $hit_image = 'blocked.jpg';
+                        $player_attack = 0;
+                }
+                elseif ($player_critical >= rand(1,100))
+                {
+                        $hit_type = 'critical';
+                        $hit_image = 'criticalhit.jpg'
+                        $player_attack += rand(1,50);
+                }
+                else
+                {
+                        $hit_type = 'hit';
+                        $hit_image = 'hit.jpg'
+                }
+                
+                $target_hp -= $player_attack;
+                $result[$i] = [
+                        'output' => $playername . 'hits for' . $player_attack,
+                        'attack' => $player_attack,
+                        'hp' => $target_hp,
+                        'image' => $hit_image, 
+                        'type' => $hit_type,
+                        'winner' => $winner == null ? null : (($target_hp <= 0) ? $playername : null)
+                ];
+                
+                // if the targets hp dropped to 0 or below, log the win into the result array.
+                if ($result[$i]['winner'] == $playername OR $result[$i] !== null AND $target_hp <= 0)
+                {
+                        ++$i;
+                        $result[$i] = [
+                                'output' => $playername . 'has won!',
+                                'attack' => '',
+                                'hp' => '',
+                                'image' => 'victory.jpg',
+                                'type' => '',
+                                'winner' => $playername
+                        ];
+                        break;
+                }
+                else
+                {
+                
+                        $player_attack = 0; // reset the users attack
+                        $attack_turn = 'target';
+                        ++$i;
+                }
+        }
+        elseif ($attack_turn == 'target')
+        {
+         
+                if ($player_block >= rand(1,100))
+                {
+                        $hit_type = 'blocked';
+                        $hit_image = 'blocked.jpg';
+                        $target_attack = 0;
+                }
+                elseif ($target_critical >= rand(1,100))
+                {
+                        $hit_type = 'critical';
+                        $hit_image = 'criticalhit.jpg'
+                        $target_attack += rand(1,50);
+                }
+                else
+                {
+                        $hit_type = 'hit';
+                        $hit_image = 'hit.jpg';
+                }
+                
+                $player_hp -= $target_attack;
+                $result[$i] = [
+                        $targetname . 'hits for' . $target_attack,
+                        $target_attack,
+                        $player_hp,
+                        $hit_image,
+                        $hit_type
+                ];
+                $target_attack = 0;
+                ++$i;
+        }
+        
+        if ($player_hp <= 0)
+        {
+                $winner = $targetname;
+                break;
+        }
+}
