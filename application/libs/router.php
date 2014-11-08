@@ -364,7 +364,64 @@ class Html extends Template
         }
 }
 
+// -- end the MVC classes/inferfaces.
 
+// -- begin the new elitewars attacking system, pvp and pvm
+
+// url examples, using clean and query string.
+// pvp: http://example.com/attack/pvp/username/12345isthehash
+// pvp regular: http://example.com/attack.php?type=pvp&target=username&hash=12345isthehash
+// pvm: http://example.com/attack/pvm/1/12345isthehash
+// pvm regular: http://example.com/attack.phptype=pvp&target=1&hash=12345isthehash
+// the route to store to make the it work.
+$route = [
+        'attack/:type/:target/:hash' => 'attack:attack'
+        ];
+        
+
+
+namespace Attacking\Target
+class Attacking
+{
+        private $dbh;
+        
+        public function __construct($database)
+        {
+                $this->dbh = $database;
+        }
+        
+        /**
+         * Build the target fetch, 'pvp' select the user being attacked, 'pvm' select the mob.
+         * @param string $type
+         * @param mixed $target
+         * @return fetch : bool (false)
+         */
+        public function target($type, $target)
+        {
+                if ($type == 'pvp')
+                {
+                        $query = $this->dbh->prepare('SELECT `username`,`attack`,`hp`,`critical`,`block`,`rampage`
+                                FROM `stats` WHERE `username` = ?');
+                        $query->execute(array(trim($target));
+                        return ($query->rowCount() == 1) ? $query->fetch(PDO::FETCH_OBJ) : false;
+                }
+                else
+                {
+                        // NOTE: maybe call mobs.attack to 'mobs.attack as attack', 'mobs.hp as hp', 'mobs.critical as critical' ect.
+                        // so they'd be the same variables as the player vars, which will allow for a negate on the ternary ops
+                        // that are selecting to pick between player or mob vars.
+                        $query = $this->dbh->prepare('SELECT `mobs.mobname`,`mobs.attack`,`mobs.hp`,`mobs.critical`,`mobs.block` 
+                                        FROM `room_mobs`
+                                LEFT JOIN `mobs` 
+                                ON `mobs.mobid` = `room_mobs.mobid`
+                                        WHERE `room_mobs.room_mobid` = ?');
+                        $query->execute(array((int)$target));
+                        return ($query->rowCount() > 0) ? $query->fetch(PDO::FETCH_OBJ) : false;
+                }
+
+
+        
+// Procedural build, not built into the MVC framework yet.
 
 $attack_type = isset($_GET['type']);
 
@@ -384,41 +441,42 @@ if ($attack_type == 'pvp')
                 Session::setArr('feedback_negative', 'Error: You must enter a playername to attack!');
                 $this->feedbackRender();
         }
-
-        /**
-         * Build the target fetch, 'pvp' select the user being attacked, 'pvm' select the mob.
-         * @param string $type
-         * @param mixed $target
-         * @return fetch : bool (false)
-         */
-         $target_select = ($attack_type == 'pvp') ? $_POST['targetname'] : isset($_GET['mobid']);
-         public function target($type, $target)
-         {
-                return $this->players->playerByName($target)
-                // since no class is built yet for users, this is the query.
-                $query = $this->dbh->prepare('SELECT `username`,`attack`,`hp`,`critical`,`block`,`rampage`
-                        FROM `stats` WHERE `username` = ?');
-                $query->execute(array($_POST['attacker_name']));     
-         }
-         
-        
+}
+elseif ($attack_type == 'pvm')
+{
+        $mobid = isset((int)$_GET['mobid']);
 }
 
 
-// defender (player) : defender (mob)
-$target_hp = (isset($_GET['type']) == 'pvp') ? $stat['hp'] : $mob['hp'];
-$target_attack = (isset($_GET['type']) == 'pvm') ? $stat['attack'] : $mob['attack'];
+$target_select = ($attack_type == 'pvp') ? $_POST['targetname'] : isset($_GET['mobid']);
+
+
+// Target object. (player stats or mob stats)
+$attacking = new Attacking($dbh);
+$target = $attacking->target($attack_type, $target_select);
+$targetname = ($attack_type == 'pvp') ? $target->username : $target->mobs.mobname;
+$target_attack = ($attack_type == 'pvp') ? $target->attack : $target->mobs.attack;
+$target_hp = ($attack_type == 'pvp') ? $target->hp : $target->mobs.hp;
+$target_critical = ($attack_type == 'pvp') ? $target->critical : $target->mobs.critical;
+$target_block = ($attack_type == 'pvp') ? $target->block : $target->mobs.block;
 
 // Attacking loop.
-
+$result = [];
 $winner = null;
 while ($player_hp > 0 OR $target_hp > 0 AND $winner = null)
 {
         static $i = 0;
         static $attack_turn = 'player';
-        if ($attack_turn == 'player')
+        
+        // This rand/skip_player will eventually be a type of skill,
+        // so implementing some general structure for it seems like a good idea...
+        if (rand(1,800) == 800 OR rand(1,800) == 9 AND $attack_type == 'pvp')
         {
-                
+                $skip_player_turn = true;
+        }
+        if ($attack_turn == 'player' AND $skip_player_turn !== true)
+        {
+                // Types of attacks, block/miss, critical hit, and regular hit.
                 if ($target_block >= rand(1,100))
                 {
                         $hit_type = 'blocked';
@@ -441,9 +499,11 @@ while ($player_hp > 0 OR $target_hp > 0 AND $winner = null)
                 $result[$i] = [
                         'output' => $playername . 'hits for' . $player_attack,
                         'attack' => $player_attack,
-                        'hp' => $target_hp,
+                        'player_hp' => $player_hp,
+                        'target_hp' => $target_hp,
                         'image' => $hit_image, 
                         'type' => $hit_type,
+                        'turn' => 'player',
                         'winner' => $winner == null ? null : (($target_hp <= 0) ? $playername : null)
                 ];
                 
@@ -453,10 +513,12 @@ while ($player_hp > 0 OR $target_hp > 0 AND $winner = null)
                         ++$i;
                         $result[$i] = [
                                 'output' => $playername . 'has won!',
-                                'attack' => '',
-                                'hp' => '',
+                                'attack' => 0,
+                                'player_hp' => $player_hp,
+                                'target_hp' => 0,
                                 'image' => 'victory.jpg',
                                 'type' => '',
+                                'turn' => 'player',
                                 'winner' => $playername
                         ];
                         break;
@@ -471,6 +533,7 @@ while ($player_hp > 0 OR $target_hp > 0 AND $winner = null)
         }
         elseif ($attack_turn == 'target')
         {
+                $skip_player_turn = ($skip_player_turn === true) ? false : false; // set back to false.
          
                 if ($player_block >= rand(1,100))
                 {
@@ -492,19 +555,114 @@ while ($player_hp > 0 OR $target_hp > 0 AND $winner = null)
                 
                 $player_hp -= $target_attack;
                 $result[$i] = [
-                        $targetname . 'hits for' . $target_attack,
-                        $target_attack,
-                        $player_hp,
-                        $hit_image,
-                        $hit_type
+                        'output' => $targetname . 'hits for' . $target_attack,
+                        'attack' => $target_attack,
+                        'player_hp' => $player_hp,
+                        'target_hp' => $target_hp,
+                        'image' => $hit_image,
+                        'type' => $hit_type,
+                        'turn' => 'target',
+                        'winner' => $winner == null ? null : (($player_hp <= 0) ? $targetname : null)
                 ];
-                $target_attack = 0;
-                ++$i;
-        }
-        
-        if ($player_hp <= 0)
-        {
-                $winner = $targetname;
-                break;
+                
+                if ($result[$i]['winner'] == $targetname OR $result[$i] !== null AND $player_hp <= 0)
+                {
+                        ++$i;
+                        $result[$i] = [
+                                'output' => $playername . 'has won!',
+                                'attack' => '',
+                                'player_hp' => $player_hp,
+                                'target_hp' => $target_hp,
+                                'image' => 'victory.jpg',
+                                'type' => 'win',
+                                'winner' => $playername
+                        ];
+                        break;
+                }
+                else
+                {
+                        $target_attack = 0;
+                        $attack_turn = 'player';
+                        ++$i;
+                }
         }
 }
+?>
+
+<script>
+
+// Attack animation script.
+
+
+// the result array.
+var result = <?php json_encode($result); ?>;
+
+
+// Heart of the script - 
+// displays the output text ie: 'user hits for 50',
+// animates and displays the attack type over the users image. ie: 'hit', 'block'
+// subtracts health from the target and players health bar.
+// loops until a winner is found, the results array has it stored.
+function displayAttack()
+{
+        // Loop through the results array until a winner is found. 'result[i]['winner'] != null'
+        for (var i = 0; i < results.length; ++i)
+        {
+                document.getElementById('output').innerHTML = +results[i]['output']+;
+
+                type = results[i]['type'];
+
+                if (results[i]['turn'] == 'player')
+                {
+                        document.getElementById('hit_player').innerHTML = +results[i][type]+;
+                        document.getElementById('hit_target').style.display = 'block';
+                        
+                        if (results[i]['type'] == 'hit')
+                                document.getElementById('hp_player').innerHTML = Math.floor(result[i]['player_hp']) + '%';
+                                document.getElementById('hp_player').style.width = (251 / 100 * results[i]['player_hp']) + 'px';
+                                
+                }
+                elseif (results[i]['turn'] == 'target')
+                {
+                        document.getElementById('hit_target').innerHTML = +results[i][type]+;
+                        document.getElementById('hit_player').style.display = 'block';
+                        
+                        if (results[i]['type'] == 'hit')
+                                document.getElementById('hp_target').innerHTML = Math.floor(results[i]['target_hp']) + '%';
+                                document.getElementById('hp_target').style.width = (251 / 100 * results[i]['target_hp']) + 'px';
+                }
+                
+                side = (results[i]['turn'] == 'player') ? 'player' : 'target';
+                window.setTimeout('clearAttack(' + side + ')', 650);
+                
+                // check for a winner, if so; display results.. or re-loop.
+                if (results[i]['winner'] != null)
+                {
+                        color = (results[i]['winner'] == 'player') ? '#00FF00' : 'red';
+                        window.setTimeout('displayResults(color)', 900);
+                        return;
+                }
+                
+                // continue the displayAttack function.
+                window.setTimeout('displayAttack()', 900);
+        }
+}
+
+function clearAttack(side)
+{
+        if (side == 'player')
+                hit_player.style.display = 'none';
+                document.getElementById('hit_player').style.display = 'none';
+        else
+                hit_target.style.display = 'none';
+                document.getElementById('hit_target').style.display = 'none';
+}
+
+
+function displayResults()
+{
+        document.getElementById('output').innerHTML = 'Attack Complete';
+        document.getElementById('info').style.visibility = 'visible';
+}
+
+window.onload = displayAttack();
