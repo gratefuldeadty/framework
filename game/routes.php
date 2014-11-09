@@ -1,25 +1,26 @@
 <?php
 
+// Routes
 
-if ($user->requiresLogin()) {
-$router->get('', function() use ($htmlTemplate, $csrfToken, $translator) {
-return $htmlTemplate->render('login.phtml', [
-'csrfToken' => $csrfToken,
-'username' => null,
-'login' => true,
-'title' => 'Login',
-]);
-});
-$router->post('', function() use ($htmlTemplate, $csrfToken, $request, $user, $request) {
-if ($csrfToken->validate($request->post('csrfToken')) && $user->login($request->post('username'), $request->post('password'), $request->getIp())) {
-header('Location: ' . $request->getUrl());
-exit;
-}
-return $htmlTemplate->render('login.phtml', [
-'csrfToken' => $csrfToken,
-'username' => $request->post('username'),
-'login' => true,
-]);
-});
-return;
+// Login
+if ($users->requiresLogin())
+{
+        $router->get('', function() use ($htmlTemplate, $translator){
+                return $htmlTemplate->render('login', [
+                                'username' => null,
+                                'login' => true,
+                                'title' => 'Login',
+                        ]);        
+        });
+        $router->post('', function() use ($htmlTemplate, $request, $users, $request) {
+                if ($users->login($request->post('username'), $request->post('password'))) {
+                        header('Location: ' . $request->getUrl());
+                        exit;
+                }
+                return $htmlTemplate->render('login', [
+                                'username' => $request->post('username'),
+                                'login' => true,
+                        ]);
+        });
+        return;
 }
