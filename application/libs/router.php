@@ -325,8 +325,8 @@ interface Renderer
 }
 
 
-namespace application\libs\presentation
-use application\Il8n\translator
+namespace application\libs\presentation;
+use application\Il8n\translator;
 class Html extends Template
 {
         private $base_template;
@@ -642,7 +642,7 @@ function displayAttack()
                         window.setTimeout('displayResults(color)', 900);
                         return;
                 }
-                
+                //array.splice(i, 1);
                 // continue the displayAttack function.
                 window.setTimeout('displayAttack()', 900);
         }
@@ -651,10 +651,8 @@ function displayAttack()
 function clearAttack(side)
 {
         if (side == 'player')
-                hit_player.style.display = 'none';
                 document.getElementById('hit_player').style.display = 'none';
         else
-                hit_target.style.display = 'none';
                 document.getElementById('hit_target').style.display = 'none';
 }
 
