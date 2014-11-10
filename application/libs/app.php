@@ -49,7 +49,7 @@ class Application
                 else
                 {
                         // no controller found - display the error page (or main index/home page)
-                        require 'application/controller/error.php';
+                        require 'application/controller/index.php';
                         $error = new Index();
                         $error->index();
                 }
