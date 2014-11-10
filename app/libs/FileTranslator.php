@@ -1,60 +1,32 @@
-namespace OpCacheGUI\I18n;
+<?php
 
-/**
- * Translator based on translation files containing an array with texts
- *
- * @category   OpCacheGUI
- * @package    I18n
- * @author     Pieter Hordijk <info@pieterhordijk.com>
- */
+namespace App\Libs\Translators;
+
 class FileTranslator implements Translator
 {
-    /**
-     * @var array The translations
-     */
-    private $texts;
-
-    /**
-     * Creates instance
-     *
-     * @param string $translationDirectory The directory containing the translation files
-     * @param string $languageCode         The language code of which to get the translations
-     *
-     * @throws \Exception When the language is not supported (i.e. no translation file can be found for the language)
-     * @throws \Exception When the translation file is invalid (i.e. no `$texts` array present)
-     */
-    public function __construct($translationDirectory, $languageCode)
-    {
-        $translationFile = $translationDirectory . '/' . $languageCode . '.php';
-
-        if (!file_exists($translationFile)) {
-            throw new \Exception('Unsupported language (`' . $languageCode . '`).');
+        private $texts;
+        
+        public function __construct($directory, $language)
+        {
+                $file = $directory . '/' . $language . '.php';
+                if (!is_readable($file))
+                {
+                        throw new \Exception('Unsupported language (`' . $language .'`).');
+                }
+                require $file;
+                if (!isset($texts))
+                {
+                        throw new \Exception ('Translation file (`' . $file .'`) has an invalid format.');
+                }
+                $this->texts = $texts;
         }
-
-        require $translationFile;
-
-        if (!isset($texts)) {
-            throw new \Exception(
-                'The translation file (`' . $translationFile . '`) has an invalid format.'
-            );
+        
+        public function translate($key)
+        {
+                if (array_key_exists($key, $this->texts))
+                {
+                        return $this->texts[$key];
+                }
+                return '{{' . $key . '}}';
         }
-
-        $this->texts = $texts;
-    }
-
-    /**
-     * Gets the translation by key if any or a placeholder otherwise
-     *
-     * @param string $key The translation key for which to find the translation
-     *
-     * @return string The translation or a placeholder when no translation is available
-     */
-    public function translate($key)
-    {
-        if (array_key_exists($key, $this->texts)) {
-            return $this->texts[$key];
-        }
-
-        return '{{' . $key . '}}';
-    }
 }
