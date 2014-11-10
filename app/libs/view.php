@@ -4,71 +4,57 @@ use app\libs\translator;
 
 class Html extends Template
 {
+        private $template; // base page where all templates get rendered.
+        private $url; // instance of URI renderer.
+        
+        public function __construct($directory, $template, Translator $translator, UrlRenderer $url)
+        {
+                parent::__construct($directory, $translator);
+                $this->template = $template;
+                $this->url = $url;
+        }
+        
+        /**
+         * Render a template
+         * @param string $template
+         * @param array $data
+         */
+        public function render($template, array $data = [])
+        {
+                $this->variables = $data;
+                $this->variables['content'] = $this->renderTemplate($template);
+                return $this->renderTemplate($this->template);
+        }
+        
+        /**
+         * Return of the rendered template.
+         * @param string $template
+         * @return 'rendered template - output buffered'
+         */
+        private function renderTemplate($template)
+        {
+                ob_start();
+                require $this->directory . '/' . $template;
+                $content = ob_get_contents();
+                ob_end_clean();
+                return $content;
+        }
+        
+        public function view($filename)
+        {
+                require 'application/views/templates/header.php';
+                require 'application/views/' . $filename .'.php';
+                require 'application/views/template/footer.php';
+        }
+        
+        /**
+         * Render feedback messages, ie: errors, messages ect.
+         * @return void
+         */
+        public function renderFeedback()
+        {
+                require 'application/views/templates/feedback.php';
+                Session::set('feedback_positive', null);
+                Session::set('feedback_negative', null);
+        }
 
-
-
-namespace OpCacheGUI\Presentation;
-
-use OpCacheGUI\I18n\Translator;
-
-class Html extends Template
-{
-    /**
-     * @var string The base (skeleton) page in which all templates will get rendered
-     */
-    private $baseTemplate;
-
-    /**
-     * @var \OpCacheGUI\Presentation\UrlRenderer Instance of an URI renderer
-     */
-    private $url;
-
-    /**
-     * Creates instance
-     *
-     * @param string                               $templateDirectory The directory where all the templates are stored
-     * @param string                               $baseTemplate      The base (skeleton) page in which all templates
-     *                                                                will get rendered
-     * @param \OpCacheGUI\I18n\Translator          $translator        The translation service
-     * @param \OpCacheGUI\Presentation\UrlRenderer $url               Instance of an URI renderer
-     */
-    public function __construct($templateDirectory, $baseTemplate, Translator $translator, UrlRenderer $url)
-    {
-        parent::__construct($templateDirectory, $translator);
-
-        $this->baseTemplate = $baseTemplate;
-        $this->url          = $url;
-    }
-
-    /**
-     * Renders a template
-     *
-     * @param string $template The template to render
-     * @param array  $data     The data to use in the template
-     */
-    public function render($template, array $data = [])
-    {
-        $this->variables = $data;
-
-        $this->variables['content'] = $this->renderTemplate($template);
-
-        return $this->renderTemplate($this->baseTemplate);
-    }
-
-    /**
-     * Renders the template file using output buffering
-     *
-     * @param string $template The template to render
-     *
-     * @return string The rendered template
-     */
-    private function renderTemplate($template)
-    {
-        ob_start();
-        require $this->templateDirectory . '/' . $template;
-        $content = ob_get_contents();
-        ob_end_clean();
-
-        return $content;
-    }
-}
