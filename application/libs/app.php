@@ -1,38 +1,85 @@
+ <?php
+
+/**
+ * Loads the current controller and model, 
  */
-protected $controller = 'home';
-/**
-* Stores the method from the split URL
-* @var string
-*/
-protected $method = 'index';
-/**
-* Stores the parameters from the split URL
-* @var array
-*/
-protected $params = [];
-public function __construct()
+
+class Application
 {
-// Get broken up URL
-$url = $this->parseUrl();
-// Does the requested controller exist?
-// If so, set it and unset from URL array
-if (file_exists('../app/controllers/' . ucfirst($url[0]) . '.php')) {
-$this->controller = $url[0];
-unset($url[0]);
-}
-require_once '../app/controllers/' . ucfirst($this->controller) . '.php';
-$this->controller = new $this->controller();
-// Has a second parameter been passed?
-// If so, it might be the requested method
-if (isset($url[1])) {
-if (method_exists($this->controller, $url[1])) {
-$this->method = $url[1];
-unset($url[1]);
-}
-}
-// Set parameters to either the array values or an empty array
-$this->params = $url ? array_values($url) : [];
-// Call the chosen method on the chosen controller, passing
-// in the parameters array (or empty array if above was false)
-call_user_func_array([$this->controller, $this->method], $this->params);
+        private $ucontroller = null; // controller
+        private $action = null; // action/method of the controller
+        private $params = []; // parameters
+        
+        /**
+         * Constructor - initiate the application.
+         * Break down the controller, action and params to call the controller/action
+         * If no controller is found, error page is shown, 
+         */
+        public function construct()
+        {
+                $this->parseUrl();
+                if ($this->ucontroller())
+                {
+                        if (is_readable('application/controller/' . $this->ucontroller . '.php'))
+                        {
+                                require 'application/controller/' . $this->ucontroller . '.php';
+                                $this->ucontroller = new $this->ucontroller();
+                                if ($this->action)
+                                {
+                                        if (method_exists($this->ucontroller, $this->action))
+                                        {
+                                                //call_user_func_array([$this->ucontroller, $this->action], $this->params);
+                                                $this->ucontroller->{$this->action}($this->params);
+                                        }
+                                        else
+                                        {
+                                                header('Location:' . URL . 'error/index');
+                                        }
+                                }
+                                else
+                                {
+                                        $this->ucontroller->index();
+                                }
+                        }
+                        else
+                        {
+                                header('Location:' . URL . 'error/index');
+                        }
+                }
+                else
+                {
+                        // no controller found - display the error page (or main index/home page)
+                        require 'application/controller/error.php';
+                        $error = new Index();
+                        $error->index();
+                }
+        }
+
+        
+        /**
+         * Parse/split the url.
+         */
+        private function parseUrl()
+        {
+                if (isset($_GET['url']))
+                {
+                        $url = filter_var($_GET['url'], FILTER_SANITIZE_URL);
+                        $url = parse_url($url, PHP_URL_PATH);
+                        $url = explode('/', rtrim($url, '/'));
+                        
+                        $i = 0;
+                        $whitelist = [''.$url[0].'', ''.$url[1].''];
+                        foreach ($url as $value)
+                        {
+                                $this->ucontroller = ($value == $url[0]) ? $value : null;
+                                $this->action = ($value == $url[1]) ? $value : null;
+                                
+                                if (in_array($value, $whitelist))
+                                {
+                                        $this->params[] = $value;
+                                }
+                                ++$i;
+                        }
+                }
+        }
 }
