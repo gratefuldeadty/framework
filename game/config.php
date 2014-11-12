@@ -13,10 +13,10 @@ return new GameConfig([
     ],
     'application' => [
         'controllerDir' => __DIR__ . '/../controllers/',
-        'modelsDir' => __DIR__ . '/..models/',
-        'viewsDir' => __DIR__ . '/..views/',
-        'libDir' => __DIR__ . '/..library/',
+        'modelsDir' => __DIR__ . '/../models/',
+        'viewsDir' => __DIR__ . '/../views/',
+        'libraryDir' => __DIR__ . '/../library/',
         'pluginsDir' => __DIR__ . '/../plugin/',
-        'baseUri' => __DIR__ . '/'
+        'baseUri' => '/'
     ]
 ]);
