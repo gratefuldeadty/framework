@@ -238,3 +238,124 @@ class MysqlDatabase extends Database implements DatabaseInterface
     }
 }
 
+
+
+
+class Connection
+{
+    
+    /**
+     * Disconnect from PDO connection.
+     * @return void
+     */
+    public function disconnect()
+    {
+        $this->setPdo(null)->setReadPdo(null);
+    }
+    
+    /**
+     * Reconnect to database.
+     * @return void
+     */
+    public function reconnect()
+    {
+            if (is_callable($this->reconnector))
+            {
+                return call_user_func($this->reconnector, $this);
+            }
+            throw new \Exception('Lost connection. No Reconnector available.');
+    }
+    
+    /**
+     * Reconnect to the database if a connection is missing.
+     * @return void.
+     */
+    protected function reconnectIfMissionConnection()
+    {
+        if (is_null($this->getPdo()) OR is_null($this->getReadPdo()))
+        {
+            $this->reconnect();
+        }
+    }
+    
+    /**
+     * Get the currend PDO connection.
+     * @return Database extends PDO
+     */
+    public function getPdo()
+    {
+        return $this->pdo;
+    }
+    
+    /**
+     * Get the current connection used for reading.
+     * @return Database extends PDO
+     */
+    public function getReadPdo()
+    {
+        if ($this->transactions >= 1)
+            return $this->getPdo();
+            return $this->readPdo ?: $this->pdo;
+    }
+
+    /**
+     * Set PDO connection. (NOTE: these 'pdo' needs to be changed to 'dbh')
+     * @param PDO $pdo
+     * @return $this
+     */
+    public function setPdo($pdo)
+    {
+        $this->pdo = $pdo;
+        return $this;
+    }
+    
+    /**
+     * Set the connection used for reading.
+     * @param PDO $pdo
+     * @return $this
+     */
+    public function setRead($pdo)
+    {
+        $this->readPdo = $pdo;
+        return $this;
+    }
+    
+    /**
+     * Set the reconnect instance on the connection.
+     * @param callable $reconnector
+     * @return $this
+     */
+    public function setReconnector(callable $reconnector)
+    {
+        $this->reconnector = $reconnector;
+        return $this;
+    }
+    
+    /**
+     * Get database connection name.
+     * @return string\null
+     */
+    public function getName()
+    {
+        return $this->getConfig('name');
+    }
+    
+    /**
+     * Get an option from the configuration options.
+     * @param string $option
+     * @return mixed
+     */
+    public function getConfig($option)
+    {
+        return array_get($this->config, $option);
+    }
+    
+    /**
+     * Get PDO driver name.
+     * @return string
+     */
+    public function getDriverName()
+    {
+        return $this->pdo->getAttribute(\PDO::ATTR_DRIVER_NAME);
+    }
+}
