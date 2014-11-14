@@ -2,7 +2,7 @@
 
 class Auth
 {
-    protected $verify = false;
+    private $verify = false;
     public function construct(Database $dbh) 
     {
         $this->dbh = $dbh; // Database handler.
