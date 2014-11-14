@@ -57,7 +57,9 @@ class Auth
             $userid = $user['id'];
             $userAgent = $_SERVER['HTTP_USER_AGENT'];
             session_regenerate_id(true);
-            Session::initUserSession([
+            
+            // 
+            Session::userSession([
                     'logged_in' => true,
                     'userid' => $userid,
                     'userAgent' => $userAgent,
@@ -119,3 +121,12 @@ class Auth
         }
     }
 }
+
+
+    public function userSession(array $data)
+    {
+        foreach ($data as $key => $value)
+        {
+            Session::set($key, $value);
+        }
+    }
