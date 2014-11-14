@@ -1,9 +1,8 @@
 <?php
 
-use core\functions\PasswordSecurity;
-
 class Auth
 {
+    protected $verify = false;
     public function construct(Database $dbh) 
     {
         $this->dbh = $dbh; // Database handler.
@@ -57,8 +56,8 @@ class Auth
             $userid = $user['id'];
             $userAgent = $_SERVER['HTTP_USER_AGENT'];
             session_regenerate_id(true);
-            
-            // 
+    
+            // Set the users sessions.
             Session::userSession([
                     'logged_in' => true,
                     'userid' => $userid,
@@ -85,7 +84,6 @@ class Auth
     {
         if ($type == 'check')
         {
-            //$time = time() - 1 * 60;
             $query = $this->dbh->prepare('SELECT `ip` FROM `failed_logins` WHERE `ip` = ?
                 AND `time` > ?');
             $query->execute(array($ip, $time));
@@ -95,6 +93,55 @@ class Auth
         {
             $query = $this->dbh->prepare('INSERT INTO `failed_logins` (`ip`,`time`) VALUES (?,?)');
             $query->execute(array($ip, $time));
+        }
+    }
+    
+    public function register($username, $password, $verifyPass, $email, $ip)
+    {
+
+        if (!isset($username, $password, $verifyPass, $email, $ip))
+        {
+            Session::setArr('feedback_negative', 'Error: You must fill out all fields of the form.');
+            return false;
+        }
+        
+        elseif (strlen($username) < 2 OR strlen($username) > 40)
+        {
+            Session::setArr('feedback_negative', 'Error: Username may be 2-40 characters in length.')
+            return false;
+        }
+
+        elseif (checkUsername($username) == true)
+        {
+            Session::setArr('feedback_negative', 'Error: The username you entered already exists.');
+            return false;
+        }
+        
+        elseif (!preg_match('/^[\w-]+$/', $username)) // 'word' characters only ('/^[a-zA-Z0-9]+$/') ('/[^\w-.]/')
+        {
+            Session::setArr('feedback_negative', 'Error: There was invalid characters in the username you entered.');
+            return false;
+        }
+        
+        elseif (!filter_var($email, FILTER_VALIDATE_EMAIL))
+        {
+            Session::setArr('feedback_negative', 'Error: Invalid email format.');
+            return false;
+        }
+        
+        elseif ($password === $verifyPass)
+        {
+            $password = password_hash($password);
+            $verified = ($this->verify === false) ? 1 : 0;
+            $query = $this->dbh->prepare('INSERT INTO `users` 
+                (`username`,`password`,`email`,`ip`, `verified`) VALUES (?,?,?,?,?)');
+            $query->execute(array($username, $password, $email, $ip, $verified));
+            return true;
+        }
+        else
+        {
+            Session::setArr('feedback_negative', 'Error: The passwords you entered did not verify.');
+            return false;
         }
     }
     
@@ -128,11 +175,46 @@ class Auth
     }
 }
 
-
-    public static function userSession(array $data)
+    
+// Registration form submit
+if (isset($_POST['register']))
+{
+    $username = isset($_POST['username']);
+    $password = isset($_POST['password']);
+    $verifyPass = isset($_POST['verifyPassword']);
+    $email = isset($_POST['email']);
+    $ip = $_SERVER['REMOTE_ADDR'];
+    if ($auth->register($username, $password, $verifyPass, $email, $ip))
     {
-        foreach ($data as $key => $value)
+        $register_complete = 1;
+        header('Location: register.php?success=true');
+    }
+    else
+    {
+        foreach (Session::get('feedback_negative') as $feedback)
         {
-            Session::set($key, $value);
+            echo '<div class="feedback negative">'.$feedback.'</div>';
+            Session::set('feedback_negative', null);
         }
     }
+}
+
+// Registration 
+if (isset($_GET['success']))
+{
+    if ($_GET['success'] == 'true')
+    {
+        if ($register_complete === 1)
+        {
+            echo 'You have successfully registered and may now login!!';
+        }
+        else
+        {
+            echo 'You must register!';
+        }
+    }
+    else
+    {
+        echo '404.';
+    }
+}
