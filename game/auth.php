@@ -45,7 +45,7 @@ class Auth
             return false;
         }
         
-        elseif (!checkBrute($ip))
+        elseif (!checkBrute($ip, $time, 'check'))
         {
             Session::setArr('feedback_negative', 'Error: Too many failed login attempts.');
             return false;
@@ -70,9 +70,7 @@ class Auth
  
         else
         {
-            
-            $query = $this->dbh->prepare('INSERT INTO `failed_logins` (`ip`,`time`) VALUES (?,?)');
-            $query->execute(array($ip, $time));
+            $this->checkBrute($ip, $time, 'log');
             Session::setArr('feedback_negative', 'Error: The password you entered was incorrect.');
             return false;
         }
@@ -83,13 +81,21 @@ class Auth
      * @param string $ip
      * @return bool
      */
-    public function checkBrute($ip, $time)
+    public function checkBrute($ip, $time, $type)
     {
-        //$time = time() - 1 * 60;
-        $query = $this->dbh->prepare('SELECT `ip` FROM `failed_logins` WHERE `ip` = ?
-            AND `time` > ?');
-        $query->execute(array($ip, $time));
-        return ($query->rowCount() >= 3) ? false : true;
+        if ($type == 'check')
+        {
+            //$time = time() - 1 * 60;
+            $query = $this->dbh->prepare('SELECT `ip` FROM `failed_logins` WHERE `ip` = ?
+                AND `time` > ?');
+            $query->execute(array($ip, $time));
+            return ($query->rowCount() >= 3) ? false : true;
+        }
+        elseif ($type == 'log')
+        {
+            $query = $this->dbh->prepare('INSERT INTO `failed_logins` (`ip`,`time`) VALUES (?,?)');
+            $query->execute(array($ip, $time));
+        }
     }
     
     
@@ -123,7 +129,7 @@ class Auth
 }
 
 
-    public function userSession(array $data)
+    public static function userSession(array $data)
     {
         foreach ($data as $key => $value)
         {
